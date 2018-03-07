@@ -246,8 +246,10 @@ ssize_t fcopy(const char *filepath_from, const char *dirpath_to)
                         buf_pos_pointer += wrbytes;
                         wrbytes_total += wrbytes;
                     } else {
-                        printerr(module, strerror(errno), filepath_to);
-                        is_rdwrerror = true;
+                        if (errno != EINTR) {
+                            printerr(module, strerror(errno), filepath_to);
+                            is_rdwrerror = true;
+                        }
                     }
                 }
             } while (!is_rdwrerror && rdbytes);
