@@ -252,8 +252,10 @@ ssize_t fcopy(const char *filepath_from, const char *dirpath_to)
                 }
             } while (!is_rdwrerror && rdbytes);
         } else {
-            printerr(module, strerror(errno), filepath_from);
-            is_rdwrerror = true;
+            if (errno != EINTR) {
+                printerr(module, strerror(errno), filepath_from);
+                is_rdwrerror = true;
+            }
         }
     }
 
