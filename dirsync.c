@@ -245,19 +245,15 @@ ssize_t fcopy(const char *filepath_from, const char *dirpath_to)
                         rdbytes -= wrbytes;
                         buf_pos_pointer += wrbytes;
                         wrbytes_total += wrbytes;
-                    } else {
-                        if (errno != EINTR) {
-                            printerr(module, strerror(errno), filepath_to);
-                            is_rdwrerror = true;
-                        }
+                    } else if (errno != EINTR) {
+                        printerr(module, strerror(errno), filepath_to);
+                        is_rdwrerror = true;
                     }
                 }
             } while (!is_rdwrerror && rdbytes);
-        } else {
-            if (errno != EINTR) {
-                printerr(module, strerror(errno), filepath_from);
-                is_rdwrerror = true;
-            }
+        } else if (errno != EINTR) {
+            printerr(module, strerror(errno), filepath_from);
+            is_rdwrerror = true;
         }
     }
 
