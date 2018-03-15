@@ -13,20 +13,24 @@
 #include <fcntl.h>
 
 #define VALID_ARGC 4
-#define FLIST_SIZE 256
 #define CHAR_BUF_SIZE 256
 #define COPY_BUF_SIZE 512
 #define MIN_RUNNING_PROC 2
 
 typedef int smode_t;
+struct flist_node {
+    char filename[PATH_MAX];
+    struct flist_node *next;
+};
 
 void printerr(const char *module, const char *errmsg, const char *filename);
 bool isdir(const char *path);
 bool isreg(const char *path);
 int sync_dirs(const char *dir1_path, const char *dir2_path, long max_running_proc);
-int fill_flist(const char *dirpath, char **files);
-void free_flist(char **files);
-bool is_in_flist(const char *filepath, char **flist);
+struct flist_node *flist_node_alloc();
+int fill_flist(const char *dirpath, struct flist_node *files);
+void free_flist(struct flist_node *files);
+bool is_in_flist(const char *filepath, struct flist_node *files);
 ssize_t fcopy(const char *filepath_from, const char *dirpath_to);
 smode_t fumask(const char *filepath);
 
@@ -114,10 +118,8 @@ bool isreg(const char *path)
 
 int sync_dirs(const char *dir1_path, const char *dir2_path, long max_running_proc)
 {
-    char **dir1_files;
-    char **dir2_files;
-    dir1_files = malloc(FLIST_SIZE * sizeof(char *));
-    dir2_files = malloc(FLIST_SIZE * sizeof(char *));
+    struct flist_node *dir1_files = flist_node_alloc();
+    struct flist_node *dir2_files = flist_node_alloc();
 
     if (fill_flist(dir1_path, dir1_files) == -1) {
         return 1;
@@ -127,20 +129,22 @@ int sync_dirs(const char *dir1_path, const char *dir2_path, long max_running_pro
     }
 
     long process_counter = 1;
+    struct flist_node *curr_node = dir1_files;
 
-    for (int i = 0; dir1_files[i]; i++) {
-        if (!is_in_flist(dir1_files[i], dir2_files)) {
+    while (curr_node->next) {
+        curr_node = curr_node->next;
+        if (!is_in_flist(curr_node->filename, dir2_files)) {
             if (process_counter == max_running_proc) {
                 wait(NULL);
             }
             pid_t pid = fork();
             if (!pid) {
-                if (fumask(dir1_files[i]) != -1) {
+                if (fumask(curr_node->filename) != -1) {
                     int bytes_copied = 0;
-                    ssize_t fcopy_result = fcopy(dir1_files[i], dir2_path);
+                    ssize_t fcopy_result = fcopy(curr_node->filename, dir2_path);
                     if (fcopy_result > 0) {
                         printf("pid: %d; source: %s; bytes copied: %d\n",
-                            getpid(), dir1_files[i], fcopy_result);
+                            getpid(), curr_node->filename, fcopy_result);
                         exit(0);
                     }
                     exit(1);
@@ -160,7 +164,16 @@ int sync_dirs(const char *dir1_path, const char *dir2_path, long max_running_pro
     return 0;
 }
 
-int fill_flist(const char *dirpath, char **files)
+struct flist_node *flist_node_alloc()
+{
+    struct flist_node *node;
+    node = malloc(sizeof(struct flist_node));
+    node->next = NULL;
+
+    return node;
+}
+
+int fill_flist(const char *dirpath, struct flist_node *files)
 {
     DIR *currdir;
     if (!(currdir = opendir(dirpath))) {
@@ -168,7 +181,7 @@ int fill_flist(const char *dirpath, char **files)
         return 1;
     }
 
-    int fnum = 0;
+    struct flist_node *curr_node = files;
 
     struct dirent *cdirent;
     while (cdirent = readdir(currdir)) {
@@ -178,28 +191,32 @@ int fill_flist(const char *dirpath, char **files)
         strcat(fullpath, cdirent->d_name);
 
         if (isreg(fullpath)) {
-            files[fnum] = malloc(PATH_MAX * sizeof(char));
-            strcpy(files[fnum++], fullpath);
+            curr_node->next = flist_node_alloc();
+            curr_node = curr_node->next;
+            strcpy(curr_node->filename, fullpath);
         }
     }
-
-    files[fnum] = NULL;
 
     closedir(currdir);
 }
 
-void free_flist(char **files)
+void free_flist(struct flist_node *files)
 {
-    for (int i = 0; files[i]; i++) {
-        free(files[i]);
+    struct flist_node *curr_node;
+
+    while ((curr_node = files) != NULL) {
+        files = files->next;
+        free(curr_node);
     }
-    free(files);
 }
 
-bool is_in_flist(const char *filepath, char **flist)
+bool is_in_flist(const char *filepath, struct flist_node *files)
 {
-    for (int i = 0; flist[i]; i++) {
-        if (!strcmp(basename(filepath), basename(flist[i]))) {
+    struct flist_node *curr_node = files;
+
+    while (curr_node->next) {
+        curr_node = curr_node->next;
+        if (!strcmp(basename(filepath), basename(curr_node->filename))) {
             return true;
         }
     }
