@@ -119,6 +119,8 @@ bool isreg(const char *path)
 int sync_dirs(const char *dir1_path, const char *dir2_path, long max_running_proc)
 {
     struct flist_node *dir1_files = flist_node_alloc();
+
+    // TODO?: I guess, it's a good idea to make this one some kind of a tree, but meeeeeh
     struct flist_node *dir2_files = flist_node_alloc();
 
     if (fill_flist(dir1_path, dir1_files) == -1) {
