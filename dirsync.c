@@ -71,7 +71,7 @@ int main(int argc, char *argv[], char *envp[])
         printerr(module, strerror(errno), NULL);
         return 1;
     }
-    if (max_running_proc <= 1) {
+    if (max_running_proc < MIN_RUNNING_PROC) {
         char errmsg[CHAR_BUF_SIZE];
         sprintf(errmsg, "Maximum of running processes must be greater or equal to %d",
             MIN_RUNNING_PROC);
